@@ -11,6 +11,7 @@ FILES = {
     "nxhid.nro": "switch/nxhid/nxhid.nro",
     "client/nxhid.py": "client/nxhid.py",
     "README.md": "README.md",
+    "LICENSE": "LICENSE",
     "docs/images/screenshot.jpg": "docs/images/screenshot.jpg",
 }
 

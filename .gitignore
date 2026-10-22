@@ -1,0 +1,10 @@
+build/
+dist/
+*.elf
+*.nro
+*.nacp
+*.map
+*.lst
+__pycache__/
+.venv/
+.DS_Store

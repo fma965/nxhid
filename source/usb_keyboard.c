@@ -43,6 +43,12 @@ enum {
 static u64 milliseconds(void) { return armTicksToNs(armGetSystemTick()) / 1000000; }
 static Result io_error(void) { return MAKERESULT(Module_Libnx, LibnxError_IoError); }
 
+// Resetting an event that is not signaled fails with InvalidState; that is not a fault.
+static Result clear_event(Event *event) {
+    Result rc = eventClear(event);
+    return rc == KERNELRESULT(InvalidState) ? 0 : rc;
+}
+
 void usb_keyboard_exit(void) {
     if (initialized) usbDsExit(); // Cancels transfers before buffers can be reused.
     initialized = was_ready = false;
@@ -128,7 +134,7 @@ uint8_t usb_keyboard_leds(void) { return leds; }
 // Each control stage is bounded; any timeout requires session teardown by caller.
 static Result control_stage(bool in, size_t size) {
     Event *event = in ? &interface->CtrlInCompletionEvent : &interface->CtrlOutCompletionEvent;
-    Result rc = eventClear(event);
+    Result rc = clear_event(event);
     if (R_FAILED(rc)) return rc;
     u32 id, transferred;
     rc = in ? usbDsInterface_CtrlInPostBufferAsync(interface, control_buffer, size, &id)
@@ -136,7 +142,7 @@ static Result control_stage(bool in, size_t size) {
     if (R_FAILED(rc)) return rc;
     rc = eventWait(event, CONTROL_TIMEOUT_NS);
     if (R_FAILED(rc)) return rc;
-    rc = eventClear(event);
+    rc = clear_event(event);
     if (R_FAILED(rc)) return rc;
     UsbDsReportData reports;
     rc = in ? usbDsInterface_GetCtrlInReportData(interface, &reports)
@@ -160,7 +166,7 @@ static Result service_setup(void) {
     Result rc = eventWait(&interface->SetupEvent, 0);
     if (rc == KERNELRESULT(TimedOut)) return 0;
     if (R_FAILED(rc)) return rc;
-    rc = eventClear(&interface->SetupEvent);
+    rc = clear_event(&interface->SetupEvent);
     if (R_FAILED(rc)) return rc;
     struct usb_control_setup s;
     rc = usbDsInterface_GetSetupPacket(interface, &s, sizeof(s));
@@ -215,7 +221,7 @@ Result usb_keyboard_write(const uint8_t report[8]) {
     if (R_FAILED(rc)) return rc;
     if (state != UsbState_Configured) return io_error();
     memcpy(input_buffer, report, 8);
-    rc = eventClear(&endpoint->CompletionEvent);
+    rc = clear_event(&endpoint->CompletionEvent);
     if (R_FAILED(rc)) return rc;
     u32 id, transferred;
     rc = usbDsEndpoint_PostBufferAsync(endpoint, input_buffer, 8, &id);
@@ -229,7 +235,7 @@ Result usb_keyboard_write(const uint8_t report[8]) {
         if (R_FAILED(rc)) return rc;
         if (milliseconds() >= deadline) return KERNELRESULT(TimedOut);
     }
-    rc = eventClear(&endpoint->CompletionEvent);
+    rc = clear_event(&endpoint->CompletionEvent);
     if (R_FAILED(rc)) return rc;
     UsbDsReportData reports;
     rc = usbDsEndpoint_GetReportData(endpoint, &reports);

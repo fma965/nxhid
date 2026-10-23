@@ -24,7 +24,11 @@ bool hosversionBefore(int major, int minor, int micro) {
 u64 armGetSystemTick(void) { return now_ns; }
 u64 armTicksToNs(u64 ticks) { return ticks; }
 void armDCacheFlush(void *buffer, size_t size) { (void)buffer; (void)size; }
-Result eventClear(Event *event) { event->signaled = false; return 0; }
+Result eventClear(Event *event) {
+    bool was_signaled = event->signaled;
+    event->signaled = false;
+    return was_signaled ? 0 : KERNELRESULT(InvalidState); // Like svcResetSignal.
+}
 Result eventWait(Event *event, u64 timeout) {
     if (event->error) return event->error;
     if (event->signaled) return 0;
